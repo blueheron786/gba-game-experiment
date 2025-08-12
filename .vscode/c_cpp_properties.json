@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "GBA",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${env:DEVKITARM}/arm-none-eabi/include/**",
+                "${env:DEVKITPRO}/libgba/include/**"
+            ],
+            "defines": [
+                "__GBA__",
+                "ARM7",
+                "_DEBUG"
+            ],
+            "compilerPath": "${env:DEVKITARM}/bin/arm-none-eabi-g++",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "gcc-arm",
+            "compilerArgs": [
+                "-mthumb",
+                "-mthumb-interwork",
+                "-mcpu=arm7tdmi",
+                "-mtune=arm7tdmi",
+                "-fno-exceptions",
+                "-fno-rtti"
+            ]
+        }
+    ],
+    "version": 4
+}
