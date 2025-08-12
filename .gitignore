@@ -1,4 +1,13 @@
-*.gba
-*.map
-*.elf
+# build output
 *.o
+# final binaries
+*.gba
+*.elf
+
+# intermediate files
+*.map
+
+# gbafix
+*.exe
+# save file: debugging...
+*.sav

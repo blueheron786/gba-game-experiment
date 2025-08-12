@@ -1,0 +1,1 @@
+Make sure `gbafix.exe` is in this directory.
