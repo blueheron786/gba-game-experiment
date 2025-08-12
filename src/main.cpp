@@ -73,50 +73,19 @@ public:
 };
 
 extern "C" int main() {
-    // Initialize display
-    GBADisplay display;
+    // Set GBA to Mode 3 (240x160 bitmap mode)
+    REG_DISPCNT = MODE_3 | BG2_ENABLE;
     
-    int frame_counter = 0;
+    // Fill the entire screen with bright red to test
+    volatile std::uint16_t* vram = VIDEO_BUFFER;
+    for (int i = 0; i < SCREEN_WIDTH * SCREEN_HEIGHT; i++) {
+        vram[i] = RGB15(31, 0, 0);  // Bright red
+    }
     
-    // Main game loop
+    // Simple infinite loop to keep the program running
     while (true) {
-        frame_counter++;
-        
-        // Clear screen to dark blue
-        display.clearScreen(RGB15(0, 0, 10));
-        
-        // Test 1: Draw some pixels to verify basic pixel plotting works
-        display.plotPixel(10, 10, COLOR_WHITE);
-        display.plotPixel(11, 10, COLOR_RED);
-        display.plotPixel(12, 10, COLOR_GREEN);
-        display.plotPixel(13, 10, COLOR_BLUE);
-        display.plotPixel(14, 10, COLOR_YELLOW);
-        
-        // Test 2: Draw a static rectangle
-        display.drawRect(50, 50, 40, 30, COLOR_RED);
-        
-        // Test 3: Draw a moving rectangle
-        int moving_x = 100 + static_cast<int>(60.0f * std::sin(frame_counter * 0.03f));
-        display.drawRect(moving_x, 80, 20, 20, COLOR_YELLOW);
-        
-        // Test 4: Draw some lines
-        display.drawLine(0, 0, 100, 0, COLOR_WHITE);
-        display.drawLine(0, 0, 0, 100, COLOR_WHITE);
-        
-        // Test 5: Draw animated dots showing frame counter
-        int dots = (frame_counter / 20) % 30;
-        for (int i = 0; i < dots; i++) {
-            display.plotPixel(200 + i, 20, COLOR_MAGENTA);
-        }
-        
-        // Test 6: Draw a pattern
-        for (int i = 0; i < 20; i++) {
-            display.plotPixel(150 + i, 120, COLOR_GREEN);
-            display.plotPixel(150, 120 + i, COLOR_GREEN);
-        }
-        
-        // Frame rate control
-        for (volatile int i = 0; i < 10000; i++) {
+        // Do nothing, just keep the red screen displayed
+        for (volatile int i = 0; i < 100000; i++) {
             // Busy wait
         }
     }

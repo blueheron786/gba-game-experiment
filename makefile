@@ -10,7 +10,7 @@ PREFIX := arm-none-eabi-
 CXX := $(PREFIX)g++
 OBJCOPY := $(PREFIX)objcopy
 OBJDUMP := $(PREFIX)objdump
-GBAFIX := ./gbafix
+GBAFIX := ./gbafix.exe
 
 # Find source files
 CPPFILES := $(shell find $(SOURCES) -name "*.cpp")
@@ -47,14 +47,11 @@ $(OUTPUT)/$(PROJECT).elf: $(BUILD) $(OUTPUT) $(OFILES)
 
 $(OUTPUT)/$(PROJECT).gba: $(OUTPUT)/$(PROJECT).elf
 	$(OBJCOPY) -O binary $< $@
-	@if command -v $(GBAFIX) >/dev/null 2>&1; then \
-		$(GBAFIX) $@; \
-		echo "Fixed GBA header with gbafix"; \
-	else \
-		echo "Warning: gbafix not found, manually adding basic header"; \
-		dd if=/dev/zero bs=1 count=262144 >> $@ 2>/dev/null || true; \
-		truncate -s 262144 $@ 2>/dev/null || true; \
-	fi
+	# Pad ROM to 32KB if needed (Windows PowerShell)
+	powershell -ExecutionPolicy Bypass -File pad_rom.ps1 $@ $@
+	$(GBAFIX) $@ -p
+	echo "ROM fixed!"
+	echo "Fixed GBA header with gbafix"
 
 $(BUILD)/%.o: $(SOURCES)/%.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
