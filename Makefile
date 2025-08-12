@@ -28,7 +28,7 @@ $(ELF): $(OBJ) | $(OUT_DIR)
 
 $(BIN): $(ELF) | $(OUT_DIR)
 	arm-none-eabi-objcopy -O binary $< $@
-	./'s required for it to bot?gbafix.exe $@
+	./gbafix.exe $@
 
 $(TARGET).gba: $(BIN)
 	mv $(BIN) $(TARGET).gba
