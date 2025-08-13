@@ -26,7 +26,10 @@ make
 This will compile the source files and generate the executable.
 
 ## Usage
-After building the project, you can run the generated executable on a GBA emulator or flash it to a GBA device.
+- Grab a copy of `gbafix.exe` and drop it into your repo directory
+- Run `make` (and on subsequent builds, I recommend `make clean`)
+  
+After building the project, you can run the generated executable on a GBA emulator like mGBA or flash it and play it on hardware.
 
 ## Contributing
 Feel free to contribute to this project by submitting issues or pull requests.
