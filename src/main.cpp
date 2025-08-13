@@ -104,6 +104,12 @@ int main() {
         drawRect(fb, obstacles[i].x, obstacles[i].y, obstacles[i].w, obstacles[i].h, obstacles[i].color);
     }
     
+    // Draw initial player
+    drawRect(fb, player.x, player.y, player.w, player.h, player.color);
+    
+    // Draw initial button states (all grey)
+    drawButtons(fb, 0);
+    
     while (1) {
         VBlankIntrWait(); // Wait for VBlank first to reduce flicker
         
