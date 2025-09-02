@@ -5,21 +5,141 @@
 #include <gba_systemcalls.h>
 #include <gba_interrupt.h>
 
-// Player struct
-struct Player {
-    int x, y;
-    int w, h;
+
+class Obstacle {
+public:
+    int x, y, w, h;
     u16 color;
+
+    Obstacle(int x, int y, int w, int h, u16 color)
+        : x(x), y(y), w(w), h(h), color(color) {}
+
+    void draw(u16* fb) const {
+        for (int dy = 0; dy < h; ++dy) {
+            for (int dx = 0; dx < w; ++dx) {
+                if (x + dx >= 0 && x + dx < 240 && y + dy >= 0 && y + dy < 160) {
+                    fb[(y + dy) * 240 + (x + dx)] = color;
+                }
+            }
+        }
+    }
 };
 
-// Static obstacle positions
-struct Obstacle {
-    int x, y;
-    int w, h;
+enum Direction { DIR_UP, DIR_DOWN, DIR_LEFT, DIR_RIGHT };
+
+class Player {
+public:
+    int x, y, w, h;
     u16 color;
+    Direction dir;
+
+    Player(int x, int y, int w, int h, u16 color)
+        : x(x), y(y), w(w), h(h), color(color), dir(DIR_RIGHT) {}
+
+    void draw(u16* fb) const {
+        for (int dy = 0; dy < h; ++dy) {
+            for (int dx = 0; dx < w; ++dx) {
+                if (x + dx >= 0 && x + dx < 240 && y + dy >= 0 && y + dy < 160) {
+                    fb[(y + dy) * 240 + (x + dx)] = color;
+                }
+            }
+        }
+    }
+
+    void erase(u16* fb) const {
+        for (int dy = 0; dy < h; ++dy) {
+            for (int dx = 0; dx < w; ++dx) {
+                if (x + dx >= 0 && x + dx < 240 && y + dy >= 0 && y + dy < 160) {
+                    fb[(y + dy) * 240 + (x + dx)] = RGB5(0, 0, 0);
+                }
+            }
+        }
+    }
+
+    void move(u16 keys) {
+        if (keys & KEY_LEFT) { x -= 2; dir = DIR_LEFT; }
+        if (keys & KEY_RIGHT) { x += 2; dir = DIR_RIGHT; }
+        if (keys & KEY_UP) { y -= 2; dir = DIR_UP; }
+        if (keys & KEY_DOWN) { y += 2; dir = DIR_DOWN; }
+        if (x < 0) x = 0;
+        if (x > 240 - w) x = 240 - w;
+        if (y < 0) y = 0;
+        if (y > 160 - h) y = 160 - h;
+    }
+
+    bool collidesWith(const Obstacle& obs) const {
+        return x < obs.x + obs.w &&
+               x + w > obs.x &&
+               y < obs.y + obs.h &&
+               y + h > obs.y;
+    }
 };
 
-// Function to draw a filled rectangle
+class Bullet {
+public:
+    int x, y, w, h, dx, dy;
+    bool active;
+    u16 color;
+
+    Bullet() : x(0), y(0), w(4), h(4), dx(0), dy(0), active(false), color(RGB5(31,0,0)) {}
+
+    void spawn(int px, int py, Direction dir) {
+        x = px + 6; y = py + 6; // center of player
+        w = 4; h = 4;
+        color = RGB5(31,0,0);
+        active = true;
+        switch (dir) {
+            case DIR_UP: dx = 0; dy = -4; break;
+            case DIR_DOWN: dx = 0; dy = 4; break;
+            case DIR_LEFT: dx = -4; dy = 0; break;
+            case DIR_RIGHT: dx = 4; dy = 0; break;
+        }
+    }
+
+    void move() {
+        x += dx;
+        y += dy;
+    }
+
+    void draw(u16* fb) const {
+        if (!active) return;
+        for (int dy_ = 0; dy_ < h; ++dy_) {
+            for (int dx_ = 0; dx_ < w; ++dx_) {
+                int px = x + dx_;
+                int py = y + dy_;
+                if (px >= 0 && px < 240 && py >= 0 && py < 160) {
+                    fb[py * 240 + px] = color;
+                }
+            }
+        }
+    }
+
+    void erase(u16* fb) const {
+        if (!active) return;
+        for (int dy_ = 0; dy_ < h; ++dy_) {
+            for (int dx_ = 0; dx_ < w; ++dx_) {
+                int px = x + dx_;
+                int py = y + dy_;
+                if (px >= 0 && px < 240 && py >= 0 && py < 160) {
+                    fb[py * 240 + px] = RGB5(0,0,0);
+                }
+            }
+        }
+    }
+
+    bool collidesWith(const Obstacle& obs) const {
+        return x < obs.x + obs.w &&
+               x + w > obs.x &&
+               y < obs.y + obs.h &&
+               y + h > obs.y;
+    }
+
+    bool offScreen() const {
+        return x < 0 || x + w > 240 || y < 0 || y + h > 160;
+    }
+};
+
+// Function to draw a filled rectangle (used for buttons)
 void drawRect(u16* fb, int x, int y, int w, int h, u16 color) {
     for (int dy = 0; dy < h; ++dy) {
         for (int dx = 0; dx < w; ++dx) {
@@ -30,13 +150,7 @@ void drawRect(u16* fb, int x, int y, int w, int h, u16 color) {
     }
 }
 
-// AABB collision detection
-bool checkCollision(const Player& player, const Obstacle& obs) {
-    return player.x < obs.x + obs.w &&
-           player.x + player.w > obs.x &&
-           player.y < obs.y + obs.h &&
-           player.y + player.h > obs.y;
-}
+// ...existing code...
 
 // Simple sound effect (beep)
 void playThudSound() {
@@ -64,119 +178,115 @@ void drawButtons(u16* fb, u16 keys) {
     drawRect(fb, 210, 10, 20, 8, (keys & KEY_R) ? blue : grey);
 }
 
+
 int main() {
-    // Set video mode 3 (bitmap) and background 2
     REG_DISPCNT = MODE_3 | BG2_ENABLE;
-    
-    // Initialize input system
     irqInit();
     irqEnable(IRQ_VBLANK);
-    
-    // Enable sound
-    REG_SOUNDCNT_X = 0x0080; // Master sound enable
-    REG_SOUNDCNT_L = 0x1177; // Enable all channels
-    REG_SOUNDCNT_H = 0x0002; // Sound A/B to 100%, timer 0/1
-    
+    REG_SOUNDCNT_X = 0x0080;
+    REG_SOUNDCNT_L = 0x1177;
+    REG_SOUNDCNT_H = 0x0002;
     u16* fb = (u16*)VRAM;
-    
-    // Initialize player (blue block)
-    Player player = {120, 80, 16, 16, RGB5(0, 15, 31)};
-    
-    // Initialize obstacles (white blocks)
+
+    Player player(120, 80, 16, 16, RGB5(0, 15, 31));
     Obstacle obstacles[] = {
-        {50, 50, 20, 20, RGB5(31, 31, 31)},
-        {180, 60, 20, 20, RGB5(31, 31, 31)},
-        {100, 120, 20, 20, RGB5(31, 31, 31)},
-        {160, 30, 20, 20, RGB5(31, 31, 31)}
+        Obstacle(50, 50, 20, 20, RGB5(31, 31, 31)),
+        Obstacle(180, 60, 20, 20, RGB5(31, 31, 31)),
+        Obstacle(100, 120, 20, 20, RGB5(31, 31, 31)),
+        Obstacle(160, 30, 20, 20, RGB5(31, 31, 31))
     };
     int numObstacles = sizeof(obstacles) / sizeof(obstacles[0]);
-    
+
     Player oldPlayer = player;
     u16 oldKeys = 0;
-    
-    // Initial screen clear
+
+    const int MAX_BULLETS = 8;
+    Bullet bullets[MAX_BULLETS];
+    Bullet oldBullets[MAX_BULLETS];
+    unsigned int frameCount = 0;
+    unsigned int lastFireFrame = 0;
+    const unsigned int fireInterval = 15; // ~250ms at 60fps
+
     for (int i = 0; i < 240 * 160; i++) {
         fb[i] = RGB5(0, 0, 0);
     }
-    
-    // Draw initial obstacles
     for (int i = 0; i < numObstacles; i++) {
-        drawRect(fb, obstacles[i].x, obstacles[i].y, obstacles[i].w, obstacles[i].h, obstacles[i].color);
+        obstacles[i].draw(fb);
     }
-    
-    // Draw initial player
-    drawRect(fb, player.x, player.y, player.w, player.h, player.color);
-    
-    // Draw initial button states (all grey)
+    player.draw(fb);
     drawButtons(fb, 0);
-    
+
     while (1) {
-        VBlankIntrWait(); // Wait for VBlank first to reduce flicker
-        
-        // Read input
+    VBlankIntrWait();
+    frameCount++;
         scanKeys();
         u16 keys = keysHeld();
-        
-        // Store old position for collision handling
         oldPlayer = player;
-        
-        // Move player with WASD (using D-pad)
-        if (keys & KEY_LEFT) player.x -= 2;
-        if (keys & KEY_RIGHT) player.x += 2;
-        if (keys & KEY_UP) player.y -= 2;
-        if (keys & KEY_DOWN) player.y += 2;
-        
-        // Keep player on screen
-        if (player.x < 0) player.x = 0;
-        if (player.x > 240 - player.w) player.x = 240 - player.w;
-        if (player.y < 0) player.y = 0;
-        if (player.y > 160 - player.h) player.y = 160 - player.h;
-        
-        // Check collisions with obstacles
+    for (int i = 0; i < MAX_BULLETS; ++i) oldBullets[i] = bullets[i];
+
+        player.move(keys);
+
         bool collided = false;
         for (int i = 0; i < numObstacles; i++) {
-            if (checkCollision(player, obstacles[i])) {
-                // Collision detected - revert to old position and play sound
+            if (player.collidesWith(obstacles[i])) {
                 player = oldPlayer;
                 playThudSound();
                 collided = true;
                 break;
             }
         }
-        
-        // Only redraw if player moved
-        if (player.x != oldPlayer.x || player.y != oldPlayer.y) {
-            // Erase old player position
-            drawRect(fb, oldPlayer.x, oldPlayer.y, oldPlayer.w, oldPlayer.h, RGB5(0, 0, 0));
-            
-            // Redraw any obstacles that might have been erased
-            for (int i = 0; i < numObstacles; i++) {
-                if (oldPlayer.x < obstacles[i].x + obstacles[i].w &&
-                    oldPlayer.x + oldPlayer.w > obstacles[i].x &&
-                    oldPlayer.y < obstacles[i].y + obstacles[i].h &&
-                    oldPlayer.y + oldPlayer.h > obstacles[i].y) {
-                    drawRect(fb, obstacles[i].x, obstacles[i].y, obstacles[i].w, obstacles[i].h, obstacles[i].color);
+
+        // Bullet logic: fire on hold every ~250ms, allow multiple bullets
+        if ((keys & KEY_A) && (frameCount - lastFireFrame >= fireInterval)) {
+            for (int i = 0; i < MAX_BULLETS; ++i) {
+                if (!bullets[i].active) {
+                    bullets[i].spawn(player.x, player.y, player.dir);
+                    lastFireFrame = frameCount;
+                    break;
                 }
             }
-            
-            // Draw player at new position
-            drawRect(fb, player.x, player.y, player.w, player.h, player.color);
         }
-        
-        // Only redraw buttons if keys changed
+
+        for (int i = 0; i < MAX_BULLETS; ++i) {
+            if (bullets[i].active) {
+                bullets[i].erase(fb);
+                bullets[i].move();
+                // Check collision with obstacles
+                for (int j = 0; j < numObstacles; j++) {
+                    if (bullets[i].collidesWith(obstacles[j])) {
+                        bullets[i].active = false;
+                        break;
+                    }
+                }
+                if (bullets[i].offScreen()) bullets[i].active = false;
+                if (bullets[i].active) bullets[i].draw(fb);
+            }
+        }
+
+        if (player.x != oldPlayer.x || player.y != oldPlayer.y) {
+            oldPlayer.erase(fb);
+            for (int i = 0; i < numObstacles; i++) {
+                if (oldPlayer.collidesWith(obstacles[i])) {
+                    obstacles[i].draw(fb);
+                }
+            }
+            player.draw(fb);
+        }
+
+        for (int i = 0; i < MAX_BULLETS; ++i) {
+            if (oldBullets[i].active && !bullets[i].active) {
+                oldBullets[i].erase(fb);
+            }
+        }
+
         if (keys != oldKeys) {
-            // Erase old button area (just clear the button regions)
-            drawRect(fb, 200, 120, 16, 16, RGB5(0, 0, 0)); // A
-            drawRect(fb, 180, 130, 16, 16, RGB5(0, 0, 0)); // B  
-            drawRect(fb, 10, 10, 20, 8, RGB5(0, 0, 0));    // L
-            drawRect(fb, 210, 10, 20, 8, RGB5(0, 0, 0));   // R
-            
-            // Draw buttons with new state
+            drawRect(fb, 200, 120, 16, 16, RGB5(0, 0, 0));
+            drawRect(fb, 180, 130, 16, 16, RGB5(0, 0, 0));
+            drawRect(fb, 10, 10, 20, 8, RGB5(0, 0, 0));
+            drawRect(fb, 210, 10, 20, 8, RGB5(0, 0, 0));
             drawButtons(fb, keys);
             oldKeys = keys;
         }
-        
-        // Update old player position
         oldPlayer = player;
     }
     return 0;
