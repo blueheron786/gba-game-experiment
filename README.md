@@ -1,7 +1,7 @@
 # GBA Project
 
 ## Overview
-This project is a simple Game Boy Advance (GBA) application that demonstrates basic graphics rendering. It sets the video mode to bitmap and displays the text "Hello World" on the screen.
+This project is a simple Game Boy Advance (GBA) application that demonstrates basic graphics rendering. You control a blue square that can walk around (but not into the white square obstacles) and shoot red bullets by pressing A or B.
 
 ## Project Structure
 ```
